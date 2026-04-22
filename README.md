@@ -27,7 +27,11 @@
 wechat_agent_bridge_skills/
 ├── README.md                              ← 你在这里
 ├── news-fact-checker/                     ← 新闻截图事实核查 Skill
-│   └── SKILL.md
+│   ├── SKILL.md
+│   └── dependencies/                      ← 推荐预装依赖 skills 的清单与安装脚本
+│       ├── README.md
+│       ├── install-skill-deps.sh
+│       └── skills.lock.json
 ├── wechat-codex_agent_bridge-skill/       ← 微信 ↔ OpenAI Codex CLI 桥接
 │   ├── SKILL.md
 │   ├── 快速启动.md
@@ -110,7 +114,7 @@ tmux attach -t wechat-cursor
 
 </details>
 
-### 二、安装新闻事实核查 Skill
+### 二、安装新闻事实核查 Skill 与推荐依赖
 
 桥接跑起来后，还需要让 Agent 知道怎么做事实核查。
 
@@ -120,14 +124,48 @@ tmux attach -t wechat-cursor
 # 复制 skill 到 Codex 能读到的位置
 mkdir -p ~/.codex/skills/news-fact-checker
 cp news-fact-checker/SKILL.md ~/.codex/skills/news-fact-checker/SKILL.md
+
+# 推荐：在首次配置时一并安装最近 30 天研究依赖
+bash news-fact-checker/dependencies/install-skill-deps.sh codex
 ```
+
+上述脚本会把：
+
+- `last30days` 安装到 `~/.codex/skills/last30days`
+- `last30days-cn` 安装到 `~/.codex/skills/last30days-cn`
 
 **Cursor 用户**（将 Skill 安装到 Cursor 技能目录）：
 
 ```bash
 mkdir -p ~/.cursor/skills/news-fact-checker
 cp news-fact-checker/SKILL.md ~/.cursor/skills/news-fact-checker/SKILL.md
+
+# 推荐：在首次配置时一并安装最近 30 天研究依赖
+bash news-fact-checker/dependencies/install-skill-deps.sh cursor
 ```
+
+上述脚本会把：
+
+- `last30days` 安装到 `~/.cursor/skills/last30days`
+- `last30days-cn` 安装到 `~/.cursor/skills/last30days-cn`
+
+如果你在 OpenClaw / ClawHub 环境里使用这些 skills，可执行：
+
+```bash
+bash news-fact-checker/dependencies/install-skill-deps.sh agents
+```
+
+会安装到：
+
+- `~/.agents/skills/last30days`
+- `~/.agents/skills/last30days-cn`
+
+依赖详情见 `news-fact-checker/dependencies/README.md`。这两个依赖 skill 的定位是：
+
+- `last30days`：补充最近 30 天的英文/全球社区讨论、开发者反馈、跨平台热度
+- `last30days-cn`：补充最近 30 天的中文平台传播、热搜轨迹、社区反馈
+
+这样用户在初次配置完成后，Agent 就已经具备了“截图核查 + 最近 30 天上下文研究”的组合能力。
 
 ### 三、开始使用
 

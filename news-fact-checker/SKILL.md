@@ -12,6 +12,25 @@ description: >
 
 用户发来一张新闻or资讯相关的截图，自动完成验证并输出可转发的综述。
 
+## 推荐预装依赖 Skills
+
+为了补充“最近30天”的社区线索和平台上下文，建议预装以下两个外部 Skill：
+
+- `last30days`：英文/全球社区近 30 天研究，适合 Reddit、X、YouTube、GitHub、Hacker News、Web 等来源
+- `last30days-cn`：中文互联网近 30 天研究，适合微博、小红书、B 站、知乎、抖音、微信公众号、百度、头条等来源
+
+依赖清单与安装脚本位于 `news-fact-checker/dependencies/`。推荐安装位置：
+
+- Codex：`~/.codex/skills/last30days` 与 `~/.codex/skills/last30days-cn`
+- Cursor：`~/.cursor/skills/last30days` 与 `~/.cursor/skills/last30days-cn`
+- OpenClaw / ClawHub：`~/.agents/skills/last30days` 与 `~/.agents/skills/last30days-cn`
+
+如果这些依赖已经安装：
+
+- 需要补充最近 30 天英文/全球社区讨论、开发者反馈、跨平台热度时，优先调用 `/last30days`
+- 需要补充最近 30 天中文平台讨论、热搜传播、社区反馈时，优先调用 `/last30days-cn`
+- 两者只用于补充线索、热度和上下文，不替代原帖定位、权威媒体核验和官方信源核验
+
 ## 工作流程
 
 ### Step 1: 识别截图内容
@@ -39,7 +58,7 @@ description: >
 - `site:x.com @账号名 关键词`
 - `x.com 账号名 关键内容片段`
 
-### Step 3: 搜索权威媒体报道
+### Step 3: 搜索权威媒体报道与近 30 天上下文
 
 用 WebSearch 搜索**多家权威媒体**的报道来交叉验证：
 
@@ -50,6 +69,13 @@ description: >
 ```
 
 搜索时用 2-3 组不同关键词组合，确保覆盖面。
+
+如果截图内容明显属于最近 30 天内持续发酵的话题，且依赖 Skills 已安装，可先补充一轮近 30 天上下文搜索：
+
+- 英文/全球社区：`/last30days <话题>`
+- 中文平台：`/last30days-cn <话题>`
+
+重点提取：最近 30 天里是否有持续讨论、争议点、社区辟谣、开发者反馈、平台热搜轨迹、关键账号发声，再回到原帖和权威媒体做交叉验证。
 
 ### Step 4: 判断真伪
 

@@ -1,0 +1,26 @@
+{
+  "dependencies": [
+    {
+      "name": "last30days",
+      "repo": "https://github.com/mvanhorn/last30days-skill.git",
+      "branch": "main",
+      "purpose": "Global and English-language recency research for the last 30 days.",
+      "recommended_roots": {
+        "codex": "~/.codex/skills/last30days",
+        "cursor": "~/.cursor/skills/last30days",
+        "agents": "~/.agents/skills/last30days"
+      }
+    },
+    {
+      "name": "last30days-cn",
+      "repo": "https://github.com/Jesseovo/last30days-skill-cn.git",
+      "branch": "main",
+      "purpose": "Chinese-platform recency research for the last 30 days.",
+      "recommended_roots": {
+        "codex": "~/.codex/skills/last30days-cn",
+        "cursor": "~/.cursor/skills/last30days-cn",
+        "agents": "~/.agents/skills/last30days-cn"
+      }
+    }
+  ]
+}
