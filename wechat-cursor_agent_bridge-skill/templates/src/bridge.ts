@@ -113,6 +113,45 @@ function formatDuration(ms: number | undefined): string {
   return `${m}m${rs}s`;
 }
 
+function hasEvidenceMarkers(text: string): boolean {
+  return /(https?:\/\/|参考链接[:：]|原帖|原始来源|权威媒体|官方来源|^##\s|^###\s)/m.test(text);
+}
+
+function looksLikeBriefSummary(text: string): boolean {
+  return text.length < 1200 && /(总结核心发现|总结一下最终结论|最终结论|总结要点)/.test(text);
+}
+
+function scoreAssistantText(text: string): number {
+  const trimmed = text.trim();
+  if (!trimmed) return 0;
+
+  let score = Math.min(trimmed.length, 20000);
+  if (hasEvidenceMarkers(trimmed)) score += 5000;
+  if (/https?:\/\//.test(trimmed)) score += 3000;
+  if (looksLikeBriefSummary(trimmed)) score -= 1500;
+  return score;
+}
+
+function chooseAssistantReply(
+  lastAssistantText: string,
+  bestAssistantText: string,
+  resultText: string,
+): string {
+  const last = lastAssistantText.trim();
+  const best = bestAssistantText.trim();
+  const result = resultText.trim();
+
+  if (best) {
+    const lastNeedsUpgrade = !last
+      || (hasEvidenceMarkers(best) && !hasEvidenceMarkers(last))
+      || (looksLikeBriefSummary(last) && best.length > last.length * 1.5)
+      || scoreAssistantText(best) >= scoreAssistantText(last) + 2500;
+    if (lastNeedsUpgrade) return best;
+  }
+
+  return last || best || result;
+}
+
 /* ---------- Cursor API 价格表（$/1M tokens，数据来源：cursor.com/docs/models） ---------- */
 
 interface ModelPricing {
@@ -622,6 +661,7 @@ async function main() {
     let stderr = '';
     let timedOut = false;
     let lastAssistantText = '';
+    let bestAssistantText = '';
     let toolCount = 0;
     let agentModel: string | undefined = cfg.model?.trim() || undefined;
 
@@ -635,7 +675,7 @@ async function main() {
       const elapsed = Math.round(cfg.agentTimeoutMs / 60000);
       console.warn(`[bridge] agent 超时 (${elapsed}min)，终止进程`);
 
-      const partial = lastAssistantText;
+      const partial = chooseAssistantReply(lastAssistantText, bestAssistantText, '');
       const notice = partial
         ? `⏰ Agent 运行超过 ${elapsed} 分钟，已自动终止。以下是已完成的部分结果：\n\n${partial}`
         : `⏰ Agent 运行超过 ${elapsed} 分钟，已自动终止。暂无可返回的结果。\n发 /stop 终止后可重新发起更小的任务。`;
@@ -681,6 +721,9 @@ async function main() {
                 const trimmed = (b.text ?? '').replace(/^\n+/, '').trim();
                 if (trimmed) {
                   lastAssistantText = trimmed;
+                  if (scoreAssistantText(trimmed) >= scoreAssistantText(bestAssistantText)) {
+                    bestAssistantText = trimmed;
+                  }
                   console.log(`[agent] 💬 ${trimmed.replace(/\n/g, ' ↵ ').slice(0, 120)}`);
                 }
               }
@@ -788,7 +831,11 @@ async function main() {
               : '';
             console.log(`[agent] ✅ 完成 (${res.duration_ms ?? '?'}ms) tools=${toolCount}${usageLog}`);
 
-            let finalText = lastAssistantText || (res.result ?? '').trim();
+            let finalText = chooseAssistantReply(
+              lastAssistantText,
+              bestAssistantText,
+              (res.result ?? '').trim(),
+            );
             if (finalText) {
               const cleaned = await extractAndSendFiles(finalText, userId, contextToken);
               const footer = cfg.showTokenUsage ? buildUsageFooter(usage, res.duration_ms, agentModel) : '';
