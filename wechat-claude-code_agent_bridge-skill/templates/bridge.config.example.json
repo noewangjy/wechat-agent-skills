@@ -1,0 +1,22 @@
+{
+  "cwd": "",
+  "claudeCodePath": "claude",
+  "model": "",
+  "permissionMode": "acceptEdits",
+  "allowedTools": [],
+  "disallowedTools": [],
+  "dangerouslySkipPermissions": false,
+  "bareMode": true,
+  "addDirs": [],
+  "agentTimeoutMs": 1800000,
+  "maxMessageLength": 4000,
+  "enableSession": true,
+  "sessionTimeoutMs": 1800000,
+  "sendThinkingHint": true,
+  "thinkingHintText": "✅ 已收到，正在调用 Claude Code 处理...",
+  "verbose": false,
+  "showTokenUsage": true,
+  "allowedUserIds": [],
+  "replyAllowedUserIds": [],
+  "replyDeniedMessage": "⚠️ 您没有查看回复的权限。请联系管理员将您的 ID 加入白名单。"
+}

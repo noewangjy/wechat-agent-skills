@@ -1,0 +1,22 @@
+{
+  "name": "wechat-claude-code-agent-bridge",
+  "version": "1.0.0",
+  "ilink_appid": "bot",
+  "description": "微信 ClawBot ↔ Claude Code CLI 桥接，支持图文文件、会话续接、微信侧 model 和 permission-mode 控制",
+  "type": "module",
+  "scripts": {
+    "setup": "node --import tsx src/setup.ts",
+    "start": "node --import tsx src/bridge.ts",
+    "dev": "node --import tsx src/hot.ts",
+    "hot": "node --import tsx src/hot.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.6.0"
+  }
+}

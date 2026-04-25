@@ -1,0 +1,6 @@
+credentials.json
+bridge.config.json
+bridge-state.json
+.media_cache/
+node_modules/
+dist/
