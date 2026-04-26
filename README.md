@@ -325,7 +325,7 @@ Meta 于4月21日宣布将在美国员工电脑上安装追踪软件...
 | `allowedTools` | `[]` | 可选，透传 `--allowedTools`（例 `["Bash(git:*)", "Edit", "Read"]`） |
 | `disallowedTools` | `[]` | 可选，透传 `--disallowedTools` |
 | `dangerouslySkipPermissions` | `false` | 若为 true 等价于 `--dangerously-skip-permissions`（仅在隔离环境使用） |
-| `bareMode` | `true` | 传 `--bare`：跳过 CLAUDE.md / hooks / plugin 自动发现，CI 推荐 |
+| `bareMode` | `false` | 为 true 时传 `--bare`：跳过全局 MCP / CLAUDE.md / hooks / OAuth 自动加载。默认 false 可直接继承 `claude mcp add` 配好的全局 MCP server |
 | `agentTimeoutMs` | `1800000` | 单次任务超时（毫秒） |
 | `enableSession` | `true` | 用 `--resume <session-id>` 续接会话 |
 | `allowedUserIds` | `[]` | 白名单，空 = 不限制 |

@@ -6,7 +6,7 @@
   "allowedTools": [],
   "disallowedTools": [],
   "dangerouslySkipPermissions": false,
-  "bareMode": true,
+  "bareMode": false,
   "addDirs": [],
   "agentTimeoutMs": 1800000,
   "maxMessageLength": 4000,

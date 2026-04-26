@@ -37,7 +37,9 @@ export interface BridgeConfig {
   disallowedTools: string[];
   /** 若为 true，传 --dangerously-skip-permissions（比 permissionMode=bypassPermissions 更强） */
   dangerouslySkipPermissions: boolean;
-  /** --bare：跳过 CLAUDE.md / hooks / plugin 自动发现，推荐用于桥接 */
+  /** --bare：跳过全局 MCP / CLAUDE.md / hooks / OAuth / keychain 等自动发现。
+   *  默认 false 以便桥接直接继承用户已经在 `claude mcp add` 配置好的全局 MCP server、
+   *  ~/.claude/CLAUDE.md 等。若希望桥接跑在最小隔离环境下（CI、共享机器），再设为 true。 */
   bareMode: boolean;
 
   addDirs: string[];
@@ -75,7 +77,7 @@ export const defaultConfig: BridgeConfig = {
   allowedTools: [],
   disallowedTools: [],
   dangerouslySkipPermissions: false,
-  bareMode: true,
+  bareMode: false,
 
   addDirs: [],
   agentTimeoutMs: 30 * 60 * 1000,

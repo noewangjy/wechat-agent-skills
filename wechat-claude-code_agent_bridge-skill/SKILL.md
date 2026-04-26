@@ -75,6 +75,8 @@ npm start
 - `allowedTools`: `["Bash(git:*)", "Edit", "Read"]`（透传 `--allowedTools`）
 - `disallowedTools`: 同上，透传 `--disallowedTools`
 - `dangerouslySkipPermissions: true` → 传 `--dangerously-skip-permissions`（覆盖 permission-mode）
+- `bareMode: true` → 传 `--bare`：跳过**所有全局配置**（包括 `claude mcp add` 配置的全局 MCP、`~/.claude/CLAUDE.md`、hooks、OAuth 等），仅供 CI / 隔离环境使用。默认 `false`，以便桥接直接继承用户本机已经配好的 MCP server 与偏好。
+- `bareMode: true` → 传 `--bare`：跳过**所有全局配置**（包括 `claude mcp add` 配置的全局 MCP、`~/.claude/CLAUDE.md`、hooks、OAuth 等），仅供 CI / 隔离环境使用。默认 `false`，以便桥接直接继承用户本机已经配好的 MCP server 与偏好。
 
 ## 重要限制
 
