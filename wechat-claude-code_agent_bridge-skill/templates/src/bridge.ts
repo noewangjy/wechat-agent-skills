@@ -265,6 +265,12 @@ interface UserContext {
   queue: PendingMsg[];
   followUpBuffer: PendingMsg[];
   killed: boolean;
+  /** 被 "空文字 + 附件" 拦截时暂存的附件，等用户下一条文字消息到来时合并进 prompt */
+  pendingAttachments: {
+    imagePaths: string[];
+    savedPaths: string[];
+    savedAt: number;
+  } | null;
 }
 
 /* ============ Claude Code stream-json 事件类型 ============ */
@@ -526,7 +532,7 @@ async function main() {
   function getOrCreateCtx(userId: string, contextToken: string): UserContext {
     let ctx = userContexts.get(userId);
     if (!ctx) {
-      ctx = { proc: null, contextToken, queue: [], followUpBuffer: [], killed: false };
+      ctx = { proc: null, contextToken, queue: [], followUpBuffer: [], killed: false, pendingAttachments: null };
       userContexts.set(userId, ctx);
     }
     ctx.contextToken = contextToken;
@@ -1012,6 +1018,32 @@ async function main() {
       return;
     }
 
+    // 空文字 + 只有附件（图片 / 文件 / 语音 / 视频）：
+    // 不启动 Claude，直接反问用户要做什么。附件先暂存，等下一条文字消息到来时一起处理。
+    // 避免 RLHF 的 helpful bias / session 续接惯性让 Claude 自动分析空消息。
+    if (!text) {
+      const ctxForStash = getOrCreateCtx(userId, contextToken);
+      const imgPaths = inbound.imageParts.map(i => i.savedPath).filter(Boolean);
+      const filePaths = inbound.savedPaths.filter(Boolean);
+      ctxForStash.pendingAttachments = {
+        imagePaths: [...(ctxForStash.pendingAttachments?.imagePaths ?? []), ...imgPaths],
+        savedPaths: [...(ctxForStash.pendingAttachments?.savedPaths ?? []), ...filePaths],
+        savedAt: Date.now(),
+      };
+
+      const parts: string[] = [];
+      if (inbound.imageParts.length) parts.push(`${inbound.imageParts.length} 张图片`);
+      if (inbound.savedPaths.length) parts.push(`${inbound.savedPaths.length} 个附件`);
+      await safeSend(
+        credentials,
+        userId,
+        contextToken,
+        `📎 已收到 ${parts.join(' + ')}。请告诉我你想做什么（例如：核查真伪 / OCR 提取文字 / 描述内容 / 翻译 / 总结 等）。附件会随你的下一条文字消息一起处理。`,
+      );
+      console.log(`[bridge] 空文字+附件，已暂存并反问 (user=${userId.slice(0, 12)}..., pending=${ctxForStash.pendingAttachments.imagePaths.length}img+${ctxForStash.pendingAttachments.savedPaths.length}files)`);
+      return;
+    }
+
     const imagePaths = inbound.imageParts.map(item => item.savedPath).filter(Boolean);
     const ctx = getOrCreateCtx(userId, contextToken);
     const isBusy = ctx.proc !== null;
@@ -1140,6 +1172,7 @@ async function main() {
     if (text === '/clear') {
       ctx.queue.length = 0;
       ctx.followUpBuffer.length = 0;
+      ctx.pendingAttachments = null;
       clearFollowUpFile(userId, cfg.cwd);
       await killAgent(ctx);
       delete state.sessions[userId];
@@ -1163,6 +1196,7 @@ async function main() {
       const fLen = ctx.followUpBuffer.length;
       ctx.queue.length = 0;
       ctx.followUpBuffer.length = 0;
+      ctx.pendingAttachments = null;
       clearFollowUpFile(userId, cfg.cwd);
       await killAgent(ctx);
       await safeSend(
@@ -1187,13 +1221,30 @@ async function main() {
     }
 
     const isExplicitQueue = text.startsWith('/排队');
-    const effectiveInbound = isExplicitQueue
+    const baseInbound = isExplicitQueue
       ? { ...inbound, text: text.slice(3).trim() }
       : inbound;
+
+    // 合并之前"空文字附件"被暂存的 pending attachments（如果有）。
+    // 它们在 ctx.pendingAttachments 里，等现在这条文字消息到来时一起送进 Claude。
+    let effectiveInbound = baseInbound;
+    if (ctx.pendingAttachments) {
+      const pendingImgs = ctx.pendingAttachments.imagePaths.map(savedPath => ({
+        mediaType: 'image/jpeg', // 占位——Claude 用 Read 工具读路径，mediaType 实际不被消费
+        base64: '',
+        savedPath,
+      }));
+      effectiveInbound = {
+        ...baseInbound,
+        imageParts: [...pendingImgs, ...baseInbound.imageParts],
+        savedPaths: [...ctx.pendingAttachments.savedPaths, ...baseInbound.savedPaths],
+      };
+      console.log(`[bridge] 合并 pending 附件: ${pendingImgs.length} 张图 + ${ctx.pendingAttachments.savedPaths.length} 个文件`);
+      ctx.pendingAttachments = null;
+    }
+
     const prompt = buildPromptText(effectiveInbound);
-    const effectiveImagePaths = isExplicitQueue
-      ? effectiveInbound.imageParts.map(item => item.savedPath).filter(Boolean)
-      : imagePaths;
+    const effectiveImagePaths = effectiveInbound.imageParts.map(item => item.savedPath).filter(Boolean);
 
     if (isBusy) {
       const totalPending = ctx.followUpBuffer.length + ctx.queue.length;
