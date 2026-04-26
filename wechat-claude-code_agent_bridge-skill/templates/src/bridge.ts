@@ -362,10 +362,9 @@ function buildPromptText(inbound: InboundPayload): string {
   if (inbound.imageParts.length) {
     lines.push(
       '',
-      '[用户发送了图片，已解密并保存到本地。请按以下优先级处理：]',
-      '1. 若你是多模态模型，直接使用内置 `Read` 工具打开图片路径即可查看画面；',
-      '2. 若你是纯文本模型（无法解析图片像素），请优先调用已加载的视觉类 MCP 工具（如以 `mcp__` 开头、名字含 vision / image / ocr / analyze 等）把图片转成文字描述或结构化信息，再继续推理；',
-      '3. 若既不能直接看图也没有合适的视觉 MCP 工具可用，再明确告诉用户"当前模型无法识别图片，请切换到多模态模型或安装视觉 MCP"。',
+      '[附件：用户随本条消息发来图片，桥接已解密保存到本地。',
+      ' 仅当用户的请求需要图片内容时再读取（多模态模型用 Read 工具，纯文本模型用视觉类 MCP 工具，如 mcp__*__extract_text_from_screenshot / analyze_image 等）。',
+      ' 若用户只是随手发图、闲聊、或未涉及图片内容，可以忽略这些附件、正常回复或反问用户想做什么。]',
       '',
       '图片路径：',
     );
@@ -375,7 +374,10 @@ function buildPromptText(inbound: InboundPayload): string {
   }
 
   if (inbound.savedPaths.length) {
-    lines.push('', '[用户发送的附件已保存到本地，请按需读取以下路径]');
+    lines.push(
+      '',
+      '[附件：用户发来的文件 / 语音 / 视频已保存到本地，仅在用户请求需要时再读取。]',
+    );
     for (const savedPath of inbound.savedPaths) {
       lines.push(`- ${savedPath}`);
     }
