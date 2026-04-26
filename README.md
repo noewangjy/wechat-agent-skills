@@ -12,11 +12,11 @@
 
 本来新闻事实核查只是一个简单的skill提示词，但为了方便的在微信中使用，所以我把之前简单改装过的cursor cli和codex cli和微信clawbot的桥接一起开源了。
 
-本项目将 **微信** 与 **Cursor Agent CLI** / **OpenAI Codex CLI** 桥接，让你可以在微信对话中直接驱动本地 AI Agent——不仅能核查新闻，还能远程写代码、操作文件、执行任何 Agent 能做的事。
+本项目将 **微信** 与 **Cursor Agent CLI** / **OpenAI Codex CLI** / **Claude Code CLI** 桥接，让你可以在微信对话中直接驱动本地 AI Agent——不仅能核查新闻，还能远程写代码、操作文件、执行任何 Agent 能做的事。
 
-默认推荐 **Cursor 版**：在微信事实核查场景下，Cursor 的 WebSearch 更适合先做原帖定位与多源交叉验证；**Codex 版**更适合强调 sandbox 权限控制和自动化执行的场景。
+默认推荐 **Cursor 版**：在微信事实核查场景下，Cursor 的 WebSearch 更适合先做原帖定位与多源交叉验证；**Codex 版**更适合强调 sandbox 权限控制和自动化执行的场景；**Claude Code 版**适合已经日常用 `claude` CLI 的用户，权限模型与 Claude Code 原生一致（`--permission-mode` + `--allowedTools`）。
 
-我们假定，本项目的用户，已经在系统上部署过codex，或者cursor的cli，暂时没有封装Claude code的桥接，如果安装CC的用户，可以直接让cc模仿封装一个，上下文都提供了，很快的。
+我们假定，本项目的用户，已经在系统上部署过codex、cursor 或者 claude code 的 cli，三个版本独立部署、互不依赖。
 
 本项目部署也很简单，在你的agent中，输入：
 > 请你部署一下https://github.com/kaixindelele/wechat_agent_bridge_skills
@@ -58,6 +58,10 @@ wechat_agent_bridge_skills/
 │   ├── SKILL.md
 │   ├── 快速启动.md
 │   └── templates/                         ← 可独立运行的 Node 桥接服务
+├── wechat-claude-code_agent_bridge-skill/ ← 微信 ↔ Claude Code CLI 桥接
+│   ├── SKILL.md
+│   ├── 快速启动.md
+│   └── templates/                         ← 可独立运行的 Node 桥接服务
 └── openclaw-weixin/                       ← 微信 ilink 通信协议 SDK (fork)
 ```
 
@@ -71,6 +75,7 @@ wechat_agent_bridge_skills/
 - 已安装并登录你选择的 Agent CLI:
   - **Cursor 用户**: `agent --version`（确认 CLI 可用）
   - **Codex 用户**: `codex login`
+  - **Claude Code 用户**: `claude --version`（≥ 2.1.x），并已 `claude auth login` 或设置 `ANTHROPIC_API_KEY`
 
 ### 一、选择你的 Agent，启动桥接
 
@@ -134,6 +139,35 @@ tmux attach -t wechat-codex
 
 </details>
 
+<details>
+<summary><b>方案 C：Claude Code CLI（适合 Claude Code 订阅用户）</b></summary>
+
+```bash
+# 1. 进入桥接目录
+cd wechat-claude-code_agent_bridge-skill/templates
+
+# 2. 安装依赖
+npm install
+
+# 3. 创建配置（编辑 cwd 为你的项目目录）
+cp bridge.config.example.json bridge.config.json
+
+# 4. 微信扫码绑定（只需一次）
+npm run setup
+
+# 5. 用 tmux 在后台启动
+tmux new-session -d -s wechat-claude 'npm start'
+```
+
+验证运行状态：
+
+```bash
+tmux attach -t wechat-claude
+# Ctrl+B, D 退出 tmux
+```
+
+</details>
+
 ### 二、安装新闻事实核查 Skill 与推荐依赖
 
 桥接跑起来后，还需要让 Agent 知道怎么做事实核查。
@@ -169,6 +203,22 @@ bash news-fact-checker/dependencies/install-skill-deps.sh codex
 
 - `last30days` 安装到 `~/.codex/skills/last30days`
 - `last30days-cn` 安装到 `~/.codex/skills/last30days-cn`
+
+**Claude Code 用户**（将 Skill 安装到 Claude Code 技能目录）：
+
+```bash
+# 复制 skill 到 Claude Code 能读到的位置
+mkdir -p ~/.claude/skills/news-fact-checker
+cp news-fact-checker/SKILL.md ~/.claude/skills/news-fact-checker/SKILL.md
+
+# 推荐：在首次配置时一并安装最近 30 天研究依赖
+bash news-fact-checker/dependencies/install-skill-deps.sh claude
+```
+
+上述脚本会把：
+
+- `last30days` 安装到 `~/.claude/skills/last30days`
+- `last30days-cn` 安装到 `~/.claude/skills/last30days-cn`
 
 如果你在 OpenClaw / ClawHub 环境里使用这些 skills，可执行：
 
@@ -247,6 +297,22 @@ Meta 于4月21日宣布将在美国员工电脑上安装追踪软件...
 | `enableSession` | `true` | 会话续接 |
 | `allowedUserIds` | `[]` | 白名单，空 = 不限制 |
 
+### Claude Code 版 `bridge.config.json`
+
+| 字段 | 默认值 | 说明 |
+|------|--------|------|
+| `cwd` | `""` | **必填**，Agent 的工作目录 |
+| `claudeCodePath` | `"claude"` | Claude Code CLI 路径 |
+| `model` | `""` | 模型名称，留空用默认；可写 `sonnet` / `opus` / `claude-sonnet-4-6` 等 |
+| `permissionMode` | `"acceptEdits"` | `default` / `acceptEdits` / `plan` / `auto` / `dontAsk` / `bypassPermissions` |
+| `allowedTools` | `[]` | 可选，透传 `--allowedTools`（例 `["Bash(git:*)", "Edit", "Read"]`） |
+| `disallowedTools` | `[]` | 可选，透传 `--disallowedTools` |
+| `dangerouslySkipPermissions` | `false` | 若为 true 等价于 `--dangerously-skip-permissions`（仅在隔离环境使用） |
+| `bareMode` | `true` | 传 `--bare`：跳过 CLAUDE.md / hooks / plugin 自动发现，CI 推荐 |
+| `agentTimeoutMs` | `1800000` | 单次任务超时（毫秒） |
+| `enableSession` | `true` | 用 `--resume <session-id>` 续接会话 |
+| `allowedUserIds` | `[]` | 白名单，空 = 不限制 |
+
 ---
 
 ## 📱 微信端指令
@@ -271,6 +337,14 @@ Codex 版额外支持：
 | `/status` | 查看桥接状态 |
 | `/sandbox` | 查看 / 切换 sandbox 模式 |
 
+Claude Code 版额外支持：
+
+| 指令 | 作用 |
+|------|------|
+| `/status` | 查看桥接状态 |
+| `/permission` | 查看当前 permission-mode |
+| `/permission <mode>` | 切换 `default` / `acceptEdits` / `plan` / `auto` / `dontAsk` / `bypassPermissions` |
+
 ---
 
 ## 🔐 安全须知
@@ -279,6 +353,7 @@ Codex 版额外支持：
 - 使用 `allowedUserIds` 限制哪些微信用户可以使用你的 Agent
 - Codex 版：通过 `sandboxMode` 控制 Agent 执行权限
 - Cursor 版：`force: false` 时，每次危险操作都需要微信端确认
+- Claude Code 版：通过 `permissionMode` + `allowedTools` / `disallowedTools` 控制；`dangerouslySkipPermissions: true` 会跳过全部检查（仅限隔离环境）
 - **不要将 `cwd` 指向你不信任的仓库**——Agent 可以读写其中所有文件
 
 ---
@@ -369,18 +444,23 @@ tmux new-session -d -s wechat-cursor 'cd /path/to/wechat-cursor_agent_bridge-ski
 
 # 如果你使用的是 Codex 版：
 tmux new-session -d -s wechat-codex 'cd /path/to/wechat-codex_agent_bridge-skill/templates && npm start'
+
+# 如果你使用的是 Claude Code 版：
+tmux new-session -d -s wechat-claude 'cd /path/to/wechat-claude-code_agent_bridge-skill/templates && npm start'
 ```
 </details>
 
 <details>
-<summary>Codex 版和 Cursor 版选哪个？</summary>
+<summary>Codex / Cursor / Claude Code 三版选哪个？</summary>
 
-| | Cursor 版 | Codex 版 |
-|---|---|---|
-| 需要的订阅 | Cursor Pro | OpenAI Codex |
-| 默认推荐场景 | 新闻截图核查、网页检索、多源交叉验证 | 批量任务、自动化执行 |
-| 权限模型 | 逐条微信审批（`force: false`） | sandbox 模式 |
-| 特点 | WebSearch 更适合作为默认事实核查入口 | 更适合强调执行权限边界和自动化流程 |
+| | Cursor 版 | Codex 版 | Claude Code 版 |
+|---|---|---|---|
+| 需要的订阅 | Cursor Pro | OpenAI Codex | Claude 订阅 / `ANTHROPIC_API_KEY` |
+| 默认推荐场景 | 新闻截图核查、网页检索、多源交叉验证 | 批量任务、自动化执行 | 日常 `claude` CLI 用户，想把工作延伸到微信 |
+| 权限模型 | 逐条微信审批（`force: false`） | sandbox 模式 | `permissionMode` + `allowedTools` |
+| 图片输入 | 原生多模态 | `codex exec --image` | 写进 prompt 让 Claude 用 `Read` 工具打开（需保留 `Read`） |
+| 会话续接 | Claude Agent SDK session | `codex exec resume <thread-id>` | `claude --resume <session-id>` |
+| 成本展示 | 取决于 SDK | 按定价表估算 | 直接用官方 `result.total_cost_usd`（准确） |
 </details>
 
 ---

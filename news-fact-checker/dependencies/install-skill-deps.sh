@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  bash news-fact-checker/dependencies/install-skill-deps.sh [codex|cursor|agents] [--root DIR]
+  bash news-fact-checker/dependencies/install-skill-deps.sh [codex|cursor|claude|agents] [--root DIR]
 
 Install or update the recommended dependency skills for news-fact-checker:
   - last30days
@@ -13,6 +13,7 @@ Install or update the recommended dependency skills for news-fact-checker:
 Examples:
   bash news-fact-checker/dependencies/install-skill-deps.sh codex
   bash news-fact-checker/dependencies/install-skill-deps.sh cursor
+  bash news-fact-checker/dependencies/install-skill-deps.sh claude
   bash news-fact-checker/dependencies/install-skill-deps.sh agents
   bash news-fact-checker/dependencies/install-skill-deps.sh codex --root /tmp/test-skills
 EOF
@@ -56,7 +57,7 @@ CUSTOM_ROOT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    codex|cursor|agents|openclaw|clawhub)
+    codex|cursor|claude|agents|openclaw|clawhub)
       TARGET="$1"
       shift
       ;;
@@ -86,6 +87,9 @@ case "$TARGET" in
     ;;
   cursor)
     DEFAULT_ROOT="$HOME/.cursor/skills"
+    ;;
+  claude)
+    DEFAULT_ROOT="$HOME/.claude/skills"
     ;;
   agents|openclaw|clawhub)
     DEFAULT_ROOT="$HOME/.agents/skills"
