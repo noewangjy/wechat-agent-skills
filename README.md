@@ -19,7 +19,7 @@
 我们假定，本项目的用户，已经在系统上部署过codex、cursor 或者 claude code 的 cli，三个版本独立部署、互不依赖。
 
 本项目部署也很简单，在你的agent中，输入：
-> 请你部署一下https://github.com/kaixindelele/wechat_agent_bridge_skills
+> 请你部署一下 https://github.com/noewangjy/wechat-agent-skills
 
 
 然后等待微信扫码，再启动一下后台服务即可。
