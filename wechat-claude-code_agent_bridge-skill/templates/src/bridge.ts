@@ -552,6 +552,7 @@ async function main() {
     const args: string[] = [
       '-p',
       '--output-format', 'stream-json',
+      '--input-format', 'text',  // stdin 是纯文本（默认 text，显式写更清晰）
       '--verbose',
     ];
 
@@ -576,8 +577,11 @@ async function main() {
       args.push('--resume', resumeSessionId);
     }
 
-    // prompt 作为 positional argument（Claude Code CLI 的标准方式）
-    args.push(prompt);
+    // prompt 通过 stdin 喂入：Claude Code CLI 2.1.119+ 对 positional prompt
+    // 的解析更严格（arg 不紧跟 -p 时会报 "Input must be provided either through
+    // stdin or as a prompt argument"）。stdin 更稳且不受 arg 解析规则影响。
+    // 需要加 --input-format text 明确告诉 CLI stdin 是纯文本（默认 stream-json
+    // 会要求逐行 JSON 事件）。
 
     console.log(
       `[claude] 启动 user=${userId.slice(0, 12)}... ${
@@ -588,7 +592,7 @@ async function main() {
     let proc: ChildProcess;
     try {
       proc = spawn(cfg.claudeCodePath, args, {
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
         cwd: cfg.cwd,
         detached: true,
       });
@@ -599,6 +603,9 @@ async function main() {
     if (!proc.stdout) {
       throw new Error('claude 进程未提供 stdout，无法读取 JSON 事件流');
     }
+
+    // 通过 stdin 把 prompt 喂入并关闭 stdin（告诉 CLI 输入已结束）
+    proc.stdin?.end(prompt);
 
     ctx.proc = proc;
     ctx.killed = false;
