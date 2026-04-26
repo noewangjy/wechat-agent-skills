@@ -154,6 +154,74 @@ function truncateForLog(text: string, limit = 200): string {
   return text.replace(/\s+/g, ' ').slice(0, limit);
 }
 
+/**
+ * 按工具类型从 tool_use.input 里挑最有用的单条字段摘要，用于日志展示。
+ * 输出形如 `Bash(git status -s)` / `Read(/abs/path.ts)` / `Grep("pattern", *.ts)`
+ */
+function summarizeToolInput(name: string, input: unknown, limit = 200): string {
+  if (!input || typeof input !== 'object') return '';
+  const obj = input as Record<string, unknown>;
+  const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v));
+
+  switch (name) {
+    case 'Bash':
+    case 'BashOutput':
+      return truncateForLog(str(obj.command), limit);
+    case 'Read':
+    case 'NotebookRead':
+      return truncateForLog(str(obj.file_path), limit);
+    case 'Write':
+      return truncateForLog(str(obj.file_path), limit);
+    case 'Edit':
+    case 'NotebookEdit': {
+      const fp = truncateForLog(str(obj.file_path), 80);
+      const old = truncateForLog(str(obj.old_string), 60);
+      return old ? `${fp}, ${JSON.stringify(old)}→...` : fp;
+    }
+    case 'Glob':
+      return truncateForLog(str(obj.pattern), limit);
+    case 'Grep': {
+      const pat = JSON.stringify(str(obj.pattern) || '');
+      const glob = obj.glob ? `, ${str(obj.glob)}` : '';
+      const type = obj.type ? `, type=${str(obj.type)}` : '';
+      return truncateForLog(`${pat}${glob}${type}`, limit);
+    }
+    case 'WebFetch':
+      return truncateForLog(str(obj.url), limit);
+    case 'WebSearch':
+      return truncateForLog(JSON.stringify(str(obj.query)), limit);
+    case 'TodoWrite': {
+      const todos = Array.isArray(obj.todos) ? obj.todos : [];
+      return `${todos.length} todo${todos.length === 1 ? '' : 's'}`;
+    }
+    case 'Task': {
+      const sub = obj.subagent_type ? `${str(obj.subagent_type)}: ` : '';
+      return truncateForLog(`${sub}${str(obj.description)}`, limit);
+    }
+    default: {
+      // MCP 工具（mcp__server__tool）或其他：取前几个短字段
+      const keys = Object.keys(obj).slice(0, 3);
+      const parts = keys.map(k => `${k}=${truncateForLog(str(obj[k]), 60)}`);
+      return truncateForLog(parts.join(', '), limit);
+    }
+  }
+}
+
+/** 把 tool_result 的 content 摘成一行（优先文本，其次 JSON） */
+function summarizeToolResult(content: unknown, limit = 200): string {
+  if (typeof content === 'string') return truncateForLog(content, limit);
+  if (Array.isArray(content)) {
+    const text = content
+      .map(c => (c && typeof c === 'object' && 'text' in c ? String((c as { text: unknown }).text ?? '') : ''))
+      .filter(Boolean)
+      .join(' ');
+    if (text) return truncateForLog(text, limit);
+    return truncateForLog(JSON.stringify(content), limit);
+  }
+  if (content == null) return '';
+  return truncateForLog(JSON.stringify(content), limit);
+}
+
 function dedupePaths(paths: string[]): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -293,7 +361,12 @@ function buildPromptText(inbound: InboundPayload): string {
   if (inbound.imageParts.length) {
     lines.push(
       '',
-      '[用户发送了图片，已保存到以下路径，请使用 Read 工具打开查看：]',
+      '[用户发送了图片，已解密并保存到本地。请按以下优先级处理：]',
+      '1. 若你是多模态模型，直接使用内置 `Read` 工具打开图片路径即可查看画面；',
+      '2. 若你是纯文本模型（无法解析图片像素），请优先调用已加载的视觉类 MCP 工具（如以 `mcp__` 开头、名字含 vision / image / ocr / analyze 等）把图片转成文字描述或结构化信息，再继续推理；',
+      '3. 若既不能直接看图也没有合适的视觉 MCP 工具可用，再明确告诉用户"当前模型无法识别图片，请切换到多模态模型或安装视觉 MCP"。',
+      '',
+      '图片路径：',
     );
     for (const image of inbound.imageParts) {
       lines.push(`- ${image.savedPath}`);
@@ -540,6 +613,9 @@ async function main() {
     let toolUseCount = 0;
     let numTurns = 0;
     let errorMessage = '';
+    let finalStopReason: string | null | undefined;
+    /** tool_use_id → tool name，便于在 tool_result 回流时反查工具名 */
+    const toolUseById = new Map<string, string>();
     const startedAt = Date.now();
     let spawnError = '';
 
@@ -591,26 +667,49 @@ async function main() {
         if (event.type === 'assistant') {
           const asst = event as AssistantMessageEvent;
           const content = asst.message?.content ?? [];
+          const textLimit = cfg.verbose ? 500 : 200;
           for (const block of content) {
             if (block.type === 'text' && typeof (block as { text: string }).text === 'string') {
               const text = (block as { text: string }).text.trim();
               if (text) {
                 lastAssistantText = text;
-                if (cfg.verbose) console.log(`[claude] msg> ${truncateForLog(text)}`);
+                console.log(`[claude] msg> ${truncateForLog(text, textLimit)}`);
               }
             } else if (block.type === 'tool_use') {
               toolUseCount++;
-              const name = (block as { name?: string }).name ?? '?';
-              console.log(`[claude] tool> ${name}`);
+              const tu = block as { id?: string; name?: string; input?: unknown };
+              const name = tu.name ?? '?';
+              if (tu.id) toolUseById.set(tu.id, name);
+              const summary = summarizeToolInput(name, tu.input, textLimit);
+              console.log(
+                summary
+                  ? `[claude] tool> ${name}(${summary})`
+                  : `[claude] tool> ${name}`,
+              );
             }
           }
+          if (asst.message?.stop_reason) finalStopReason = asst.message.stop_reason;
           usage = mergeUsage(usage, extractUsageFromRaw(asst.message?.usage));
           if (asst.message?.model && !observedModel) observedModel = asst.message.model;
           continue;
         }
 
         if (event.type === 'user') {
-          // tool_result 回流，通常不需要特别处理
+          const usr = event as UserMessageEvent;
+          const content = usr.message?.content ?? [];
+          for (const block of content) {
+            if (block.type === 'tool_result') {
+              const tr = block as { tool_use_id?: string; content?: unknown; is_error?: boolean };
+              const name = (tr.tool_use_id && toolUseById.get(tr.tool_use_id)) || '?';
+              const icon = tr.is_error ? '✗' : '✓';
+              const summary = summarizeToolResult(tr.content, cfg.verbose ? 500 : 200);
+              console.log(
+                summary
+                  ? `[claude] tool< ${name} ${icon} ${summary}`
+                  : `[claude] tool< ${name} ${icon}`,
+              );
+            }
+          }
           continue;
         }
 
@@ -620,6 +719,7 @@ async function main() {
           isError = Boolean(res.is_error);
           if (res.session_id) resultSessionId = res.session_id;
           if (typeof res.num_turns === 'number') numTurns = res.num_turns;
+          if (res.stop_reason) finalStopReason = res.stop_reason;
           if (res.usage?.service_tier) serviceTier = res.usage.service_tier;
           usage = mergeUsage(usage, extractUsageFromResult(res));
           if (typeof res.result === 'string' && res.result.trim()) {
@@ -655,7 +755,17 @@ async function main() {
         if (finalText) {
           await safeSendLong(credentials, userId, contextToken, finalText, cfg.maxMessageLength);
         }
-        console.log(`[claude] 完成 tools=${toolUseCount} turns=${numTurns} duration=${durationMs}ms`);
+        const summaryParts: string[] = [
+          `stop=${finalStopReason ?? '?'}`,
+          `turns=${numTurns}`,
+          `tools=${toolUseCount}`,
+          `duration=${durationMs}ms`,
+        ];
+        if (usage?.inputTokens != null) summaryParts.push(`in=${usage.inputTokens}`);
+        if (usage?.outputTokens != null) summaryParts.push(`out=${usage.outputTokens}`);
+        if (usage?.cacheReadInputTokens != null) summaryParts.push(`cache=${usage.cacheReadInputTokens}`);
+        if (typeof usage?.totalCostUsd === 'number') summaryParts.push(`cost=$${usage.totalCostUsd.toFixed(4)}`);
+        console.log(`[claude] end ${summaryParts.join(' ')}`);
       } else if (!timedOut && !ctx.killed) {
         const detail = spawnError || errorMessage || stderr.trim() || `exit=${proc.exitCode}`;
         await safeSend(credentials, userId, contextToken, `❌ Claude 执行失败: ${detail.slice(0, 500)}`);

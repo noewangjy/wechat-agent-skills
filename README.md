@@ -475,7 +475,7 @@ tmux new-session -d -s wechat-claude 'cd /path/to/wechat-claude-code_agent_bridg
 | 需要的订阅 | Cursor Pro | OpenAI Codex | Claude 订阅 / `ANTHROPIC_API_KEY` |
 | 默认推荐场景 | 新闻截图核查、网页检索、多源交叉验证 | 批量任务、自动化执行 | 日常 `claude` CLI 用户，想把工作延伸到微信 |
 | 权限模型 | 逐条微信审批（`force: false`） | sandbox 模式 | `permissionMode` + `allowedTools` |
-| 图片输入 | 原生多模态 | `codex exec --image` | 写进 prompt 让 Claude 用 `Read` 工具打开（需保留 `Read`） |
+| 图片输入 | 原生多模态 | `codex exec --image` | 路径写入 prompt，多模态模型用 `Read` 工具，纯文本模型走视觉 MCP |
 | 会话续接 | Claude Agent SDK session | `codex exec resume <thread-id>` | `claude --resume <session-id>` |
 | 成本展示 | 取决于 SDK | 按定价表估算 | 直接用官方 `result.total_cost_usd`（准确） |
 </details>

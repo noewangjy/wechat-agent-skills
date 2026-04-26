@@ -11,7 +11,7 @@ description: >-
 用微信连接本机运行的 `claude` CLI（Claude Code）。桥接服务基于 `claude -p --output-format stream-json`，支持：
 
 - 文字消息转发给 Claude Code
-- 图片保存到本地后让 Claude Code 用 `Read` 工具打开（Claude Code CLI 无 `--image` 参数）
+- 图片保存到本地后，多模态模型走内置 `Read` 工具读取；纯文本模型则可调用已加载的视觉类 MCP 工具（Claude Code CLI 本身无 `--image` 参数）
 - 文件、语音、视频落盘后把本地路径交给 Claude Code
 - 使用 `session_id` 自动续接上下文（`--resume`）
 - 微信端控制 `/model` / `/permission` / `/stop` / `/clear` / `/send`
