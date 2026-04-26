@@ -277,6 +277,7 @@ interface SystemInitEvent {
   cwd?: string;
   tools?: string[];
   permissionMode?: string;
+  mcp_servers?: Array<{ name: string; status?: string }>;
 }
 
 interface AssistantMessageEvent {
@@ -660,7 +661,21 @@ async function main() {
           const sys = event as SystemInitEvent;
           resultSessionId = sys.session_id;
           if (sys.model) observedModel = sys.model;
-          console.log(`[claude] session=${resultSessionId?.slice(0, 8)}... model=${sys.model ?? '?'}`);
+          const mcpBuiltin = (sys.tools ?? []).filter(t => !t.startsWith('mcp__'));
+          const mcpTools = (sys.tools ?? []).filter(t => t.startsWith('mcp__'));
+          const mcpSummary = (sys.mcp_servers ?? [])
+            .map(s => `${s.name}${s.status ? `(${s.status})` : ''}`)
+            .join(',') || '(none)';
+          console.log(
+            `[claude] session=${resultSessionId?.slice(0, 8)}... model=${sys.model ?? '?'} ` +
+              `perm=${sys.permissionMode ?? '?'} cwd=${sys.cwd ?? '?'}`,
+          );
+          console.log(
+            `[claude] tools: builtin=${mcpBuiltin.length} mcp=${mcpTools.length} servers=[${mcpSummary}]`,
+          );
+          if (cfg.verbose && mcpTools.length) {
+            console.log(`[claude] mcp tools: ${mcpTools.join(', ')}`);
+          }
           continue;
         }
 
