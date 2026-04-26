@@ -25,6 +25,23 @@
 然后等待微信扫码，再启动一下后台服务即可。
 ---
 
+## 🙏 上游项目 / Upstream
+
+本仓库 fork 自上游原项目：
+
+> **[kaixindelele/wechat_agent_bridge_skills](https://github.com/kaixindelele/wechat_agent_bridge_skills)** — 微信 ↔ Cursor / Codex Agent 桥接 + 新闻事实核查 Skill 的原始实现
+
+向原作者 **[@kaixindelele](https://github.com/kaixindelele)** 致敬。原项目贡献了本仓库的核心基础：
+
+- 微信 ClawBot / ilink 协议桥接架构
+- Cursor Agent CLI 版与 OpenAI Codex CLI 版的两套桥接实现
+- `news-fact-checker` 事实核查 Skill 的完整提示词
+- 跟上游 Tencent [openclaw-weixin](https://github.com/Tencent/openclaw-weixin) 对齐的媒体加解密与扫码登录实现
+
+本 fork 在其基础上增加了 **Claude Code CLI 桥接方案**（`wechat-claude-code_agent_bridge-skill/`），其余子项目保留与上游同步。若你看重原始创意或希望贡献到主分支，请优先前往上游 repo。
+
+---
+
 ## ✨ 核心能力
 
 | 场景 | 说明 |
@@ -468,6 +485,9 @@ tmux new-session -d -s wechat-claude 'cd /path/to/wechat-claude-code_agent_bridg
 ## 🤝 贡献
 
 欢迎提交 Issue 和 PR。如果你编写了有趣的 Skill，也欢迎提交到本仓库分享。
+
+**涉及 Cursor / Codex 桥接、`news-fact-checker` Skill、`openclaw-weixin` 协议层的改动**，建议优先提到上游 [kaixindelele/wechat_agent_bridge_skills](https://github.com/kaixindelele/wechat_agent_bridge_skills) — 让更多人受益；
+**Claude Code 桥接（`wechat-claude-code_agent_bridge-skill/`）相关改动**，可直接提到本仓库。
 
 ---
 
